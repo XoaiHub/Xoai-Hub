@@ -1,0 +1,49 @@
+-- Tạo GUI
+local player = game.Players.LocalPlayer
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Tạo Frame (menu) chính
+local menuFrame = Instance.new("Frame")
+menuFrame.Size = UDim2.new(0, 550, 0, 450)
+menuFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+menuFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+menuFrame.Visible = false  -- Menu ban đầu ẩn
+menuFrame.Parent = screenGui
+
+-- Tạo tiêu đề cho menu
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, 0, 0, 50)
+titleLabel.Text = "Xoai hub"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 24
+titleLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+titleLabel.Parent = menuFrame
+
+-- Tạo nút mở menu
+local openButton = Instance.new("TextButton")
+openButton.Size = UDim2.new(0, 100, 0, 50)
+openButton.Position = UDim2.new(0.5, -50, 0, 20)
+openButton.Text = "Mở Menu"
+openButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+openButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+openButton.Parent = screenGui
+
+-- Tạo nút đóng menu
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 60, 0,30)
+closeButton.Position = UDim2.new(0.5, -20, 0, 100)
+closeButton.Text = "Đóng"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+closeButton.Parent = menuFrame
+
+-- Xử lý mở menu khi nhấn nút
+openButton.MouseButton1Click:Connect(function()
+    menuFrame.Visible = true  -- Hiển thị menu khi nhấn nút mở
+end)
+
+-- Xử lý đóng menu khi nhấn nút đóng
+closeButton.MouseButton1Click:Connect(function()
+    menuFrame.Visible = false -- menu khi nhấn nút đóng
+end)
