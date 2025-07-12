@@ -58,7 +58,7 @@ spawn(function()
 end)
 
 -- ==========================
--- 🚂 TELEPORT + CREATE PARTY 
+-- 🚂 TELEPORT + CREATE PARTY (THEO CONFIG)
 -- ==========================
 
 if not getgenv().EnableTeleport then return end
@@ -66,6 +66,9 @@ repeat task.wait() until game:IsLoaded()
 
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
+
+local createdParty = false
+local currentZone = nil
 
 -- Lấy HRP
 local function getHRP()
@@ -105,7 +108,7 @@ local function teleportToZone(zoneName)
     end
 end
 
--- Tạo Party với chế độ
+-- Tạo Party
 local function createParty(mode)
     local args = {{
         isPrivate = true,
@@ -117,35 +120,63 @@ local function createParty(mode)
         :WaitForChild("RemoteEvent"):WaitForChild("CreateParty"):FireServer(unpack(args))
 end
 
--- Tự động kiểm tra và Teleport
+-- Tạo danh sách zone theo config
+local zoneList = {}
+for zoneName, _ in pairs(getgenv().TargetPlayersPerZone or {}) do
+    table.insert(zoneList, zoneName)
+end
+table.sort(zoneList, function(a, b) return a < b end)
+
+-- Vòng lặp chính
 task.spawn(function()
-    local zoneList = {}
-    for zoneName, _ in pairs(getgenv().TargetPlayersPerZone or {}) do
-        table.insert(zoneList, zoneName)
-    end
-    table.sort(zoneList, function(a, b) return a < b end)
-
     while getgenv().EnableTeleport do
-        for i, zoneName in ipairs(zoneList) do
-            local target = getgenv().TargetPlayersPerZone[zoneName]
-            local current = getPlayerCountInZone(zoneName)
+        local foundSlot = false
 
-            print(string.format("[%s] %d / %d", zoneName, current, target))
+        -- Nếu đã ở zone và chưa full slot → giữ nguyên
+        if currentZone then
+            local count = getPlayerCountInZone(currentZone)
+            local target = getgenv().TargetPlayersPerZone[currentZone]
 
-            if current < target then
-                teleportToZone(zoneName)
-
-                -- Delay tạo party sau khi teleport
-                task.delay(5, function()
-                    if getgenv().EnableParty then
+            if count < target then
+                print(string.format("[Đang ở %s] %d / %d", currentZone, count, target))
+                -- Tạo party nếu chưa tạo
+                if not createdParty and getgenv().EnableParty then
+                    task.delay(1, function()
                         if getgenv().EnableParty["Normal"] then createParty("Normal") end
                         if getgenv().EnableParty["ScorchedEarth"] then createParty("Scorched Earth") end
                         if getgenv().EnableParty["Nightmare"] then createParty("Nightmare") end
-                    end
-                end)
-                break
+                        createdParty = true
+                        print("[Party Created]")
+                    end)
+                end
+
+                foundSlot = true
+            else
+                currentZone = nil
+                createdParty = false
             end
         end
+
+        -- Nếu chưa ở zone hoặc zone đã full, tìm zone mới
+        if not foundSlot then
+            for _, zoneName in ipairs(zoneList) do
+                local count = getPlayerCountInZone(zoneName)
+                local target = getgenv().TargetPlayersPerZone[zoneName]
+
+                if count < target then
+                    teleportToZone(zoneName)
+                    currentZone = zoneName
+                    createdParty = false
+                    foundSlot = true
+                    break
+                end
+            end
+        end
+
+        if not foundSlot then
+            print("[Tất cả zone đã đầy] → Đứng yên")
+        end
+
         task.wait(getgenv().TeleportInterval or 5)
     end
 end)
