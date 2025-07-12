@@ -3,13 +3,16 @@
 -- ==========================
 local cfg = getgenv().Settings
 
+-- 🔒 Lock FPS thủ công
 if cfg["Lock FPS"] and cfg["Lock FPS"]["Enabled"] then
     setfpscap(cfg["Lock FPS"]["FPS"])
 end
 
+-- ⚙️ Boost Server Script
 local function optimizeGame()
     if not cfg["Boost Server"] then return end
 
+    -- 🧹 Xoá object theo tên
     if cfg["Object Removal"] and cfg["Object Removal"]["Enabled"] then
         for _, obj in ipairs(workspace:GetDescendants()) do
             for _, name in ipairs(cfg["Object Removal"]["Targets"]) do
@@ -20,6 +23,7 @@ local function optimizeGame()
         end
     end
 
+    -- 💨 Xoá hiệu ứng
     if cfg["Remove Effects"] then
         for _, v in ipairs(workspace:GetDescendants()) do
             if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
@@ -28,6 +32,7 @@ local function optimizeGame()
         end
     end
 
+    -- 🔇 Xoá âm thanh
     if cfg["Remove Sounds"] then
         for _, sound in ipairs(workspace:GetDescendants()) do
             if sound:IsA("Sound") and sound.Looped then
@@ -36,6 +41,7 @@ local function optimizeGame()
         end
     end
 
+    -- 🌙 Tối giản ánh sáng
     if cfg["Simplify Lighting"] then
         local lighting = game:GetService("Lighting")
         lighting.FogEnd = 1000000
@@ -51,42 +57,42 @@ spawn(function()
     end
 end)
 
+-- ==========================
+-- 🚂 TELEPORT + CREATE PARTY (THEO CONFIG)
+-- ==========================
 
--- ==========================
--- 🚂 TELEPORT + CREATE PARTY
--- ==========================
 if not getgenv().EnableTeleport then return end
 repeat task.wait() until game:IsLoaded()
 
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
-local currentZone = nil
 
+-- Lấy HRP
 local function getHRP()
     local char = player.Character or player.CharacterAdded:Wait()
     return char:WaitForChild("HumanoidRootPart")
 end
 
+-- Đếm số người trong Zone
 local function getPlayerCountInZone(zoneName)
     local zone = workspace:WaitForChild("PartyZones", 10):FindFirstChild(zoneName)
-    if not zone then return 0 end
+    if not zone then return math.huge end
     local hitbox = zone:FindFirstChild("Hitbox")
-    if not hitbox then return 0 end
+    if not hitbox then return math.huge end
 
     local count = 0
     for _, p in pairs(Players:GetPlayers()) do
         local char = p.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            local dist = (char.HumanoidRootPart.Position - hitbox.Position).Magnitude
-            if dist < 15 then
-                count += 1
-            end
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp and (hrp.Position - hitbox.Position).Magnitude <= 15 then
+            count += 1
         end
     end
     return count
 end
 
-local function teleportTo(zoneName)
+-- Teleport đến Zone
+local function teleportToZone(zoneName)
     local zone = workspace:WaitForChild("PartyZones", 10):FindFirstChild(zoneName)
     if not zone then return end
     local hitbox = zone:FindFirstChild("Hitbox")
@@ -94,17 +100,16 @@ local function teleportTo(zoneName)
 
     local hrp = getHRP()
     if hrp then
-        local yOffset = getgenv().YOffset or 5
-        hrp.CFrame = CFrame.new(hitbox.Position + Vector3.new(0, yOffset, 0))
-        currentZone = zoneName
+        hrp.CFrame = CFrame.new(hitbox.Position + Vector3.new(0, getgenv().YOffset or 5, 0))
         print("[Teleported to]:", zoneName)
     end
 end
 
+-- Tạo Party với chế độ
 local function createParty(mode)
     local args = {{
         isPrivate = true,
-        maxMembers = getgenv().TargetPlayersPerZone[currentZone] or 1,
+        maxMembers = 1,
         trainId = "default",
         gameMode = mode
     }}
@@ -112,60 +117,70 @@ local function createParty(mode)
         :WaitForChild("RemoteEvent"):WaitForChild("CreateParty"):FireServer(unpack(args))
 end
 
+-- Ghi nhớ zone hiện tại
+local currentZone = nil
+
+-- Danh sách zone theo config
+local zoneList = {}
+for zoneName, _ in pairs(getgenv().TargetPlayersPerZone or {}) do
+    table.insert(zoneList, zoneName)
+end
+table.sort(zoneList, function(a, b) return a < b end)
+
+-- Tự động kiểm tra và Teleport
 task.spawn(function()
-    local zoneList = {}
-    for zoneName, _ in pairs(getgenv().TargetPlayersPerZone) do
-        table.insert(zoneList, zoneName)
-    end
-    table.sort(zoneList, function(a, b) return a < b end)
-
     while getgenv().EnableTeleport do
-        local foundEmptyZone = false
+        if currentZone then
+            local currentCount = getPlayerCountInZone(currentZone)
+            local targetCount = getgenv().TargetPlayersPerZone[currentZone]
 
-        for _, zoneName in ipairs(zoneList) do
-            local target = getgenv().TargetPlayersPerZone[zoneName]
-            local current = getPlayerCountInZone(zoneName)
+            print(string.format("[Đang ở %s] %d / %d", currentZone, currentCount, targetCount))
 
-            print(string.format("[%s] %d / %d", zoneName, current, target))
-
-            if not currentZone or (currentZone == zoneName and current >= target) then
-                if current < target then
-                    teleportTo(zoneName)
-                    foundEmptyZone = true
-                    break
-                end
-            elseif currentZone == zoneName and current < target then
-                foundEmptyZone = true
-                break
+            if currentCount < targetCount then
+                -- Đủ slot thì đứng yên
+                task.wait(getgenv().TeleportInterval or 5)
+                continue
+            else
+                -- Zone hiện tại đã full → reset
+                currentZone = nil
             end
         end
 
-        if not foundEmptyZone then
-            print("[Tất cả zone đã đầy - đang chờ có chỗ trống]")
-        end
+        -- Tìm zone mới có slot
+        for _, zoneName in ipairs(zoneList) do
+            local count = getPlayerCountInZone(zoneName)
+            local target = getgenv().TargetPlayersPerZone[zoneName]
 
-        if getgenv().EnableParty and currentZone then
-            for mode, isEnabled in pairs(getgenv().EnableParty) do
-                if isEnabled then
-                    createParty(mode)
-                end
+            if count < target then
+                teleportToZone(zoneName)
+                currentZone = zoneName
+
+                -- Tạo party sau khi vào zone
+                task.delay(5, function()
+                    if getgenv().EnableParty then
+                        if getgenv().EnableParty["Normal"] then createParty("Normal") end
+                        if getgenv().EnableParty["ScorchedEarth"] then createParty("Scorched Earth") end
+                        if getgenv().EnableParty["Nightmare"] then createParty("Nightmare") end
+                    end
+                end)
+
+                break
             end
         end
 
         task.wait(getgenv().TeleportInterval or 5)
     end
 end)
-
-
 -- ==========================
--- 🧩 UI BOND
+-- 🧩 UI Mochi Hub
+-- có thể tự xóa ui
 -- ==========================
 if game.CoreGui:FindFirstChild("MochiUI") then
-    game.CoreGui.MochiUI:Destroy()
+    game.CoreGui.NexonUI:Destroy()
 end
 
 local gui = Instance.new("ScreenGui", game.CoreGui)
-gui.Name = "MochiUI"
+gui.Name = "MochiUi"
 gui.ResetOnSpawn = false
 
 local mainFrame = Instance.new("Frame", gui)
@@ -193,9 +208,9 @@ logo.Image = "rbxassetid://..."
 logo.ScaleType = Enum.ScaleType.Fit
 
 local bondLabel = Instance.new("TextLabel", bondFrame)
-bondLabel.Size = UDim2.new(0, 300, 0, 50)
-bondLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
-bondLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+bondLabel.Size = UDim2.new(0, 300, 0, 50)  -- Width: 300px, Height: 50px (có thể tùy chỉnh)
+bondLabel.Position = UDim2.new(0.5, 0, 0.5, 0)  -- Giữa bondFrame
+bondLabel.AnchorPoint = Vector2.new(0.5, 0.5)  -- Căn giữa theo toạ độ gốc
 bondLabel.BackgroundTransparency = 1
 bondLabel.Text = "Bond (+0)"
 bondLabel.TextSize = 40
@@ -204,8 +219,13 @@ bondLabel.TextColor3 = Color3.new(1, 1, 1)
 bondLabel.TextXAlignment = Enum.TextXAlignment.Center
 bondLabel.TextYAlignment = Enum.TextYAlignment.Center
 
+-- ==========================
+-- 🔁 Bond, Auto Farm, MaximGun, Train
+-- ==========================
 if not game:IsLoaded() then game.Loaded:Wait() end
 repeat task.wait() until player.Character and player.PlayerGui:FindFirstChild("LoadingScreenPrefab") == nil
+
+game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("EndDecision"):FireServer(false)
 
 _G.Bond = 0
 workspace.RuntimeItems.ChildAdded:Connect(function(v)
@@ -223,10 +243,6 @@ spawn(function()
     end
 end)
 
-
--- ==========================
--- 🔁 AUTO FARM + MAXIMGUN + TRAIN
--- ==========================
 player.CameraMode = "Classic"
 player.CameraMaxZoomDistance = math.huge
 player.CameraMinZoomDistance = 30
