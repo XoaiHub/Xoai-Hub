@@ -1,4 +1,5 @@
-RegionFilterEnabled = false,
+local Config = {
+    RegionFilterEnabled = false,
     RegionList = { "singapore", "tokyo", "us-east" },
     RetryHttpDelay = 2,
 }
