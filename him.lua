@@ -3,7 +3,7 @@
 -- Giữ nguyên cấu hình theo yêu cầu của bạn: getgenv().Config = { ... }
 
 -- >>>>>>> THAY LINK WEBHOOK CỦA BẠN TẠI ĐÂY <<<<<<<
-local WEBHOOK_URL = "https://discord.com/api/webhooks/PUT_YOUR_PUBLIC_WEBHOOK_HERE"
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1414772367930163270/Zhd2kiXZY2Bf0km8rH1Shr8Zf-ce9biX2aLtoWQ5pbzb8GrZHFTYFR_IFlcKCeLK60ob"
 
 -- ========================== Không chỉnh bên dưới ===============================
 local MIN_BALLS        = 800
